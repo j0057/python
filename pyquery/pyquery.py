@@ -115,8 +115,17 @@ class Query_Elements(Query_Base):
 		except ValueError:
 			return default
 	
-	def single(self):
-		pass
+	def single(self, pred=None):
+		i = iter(self)
+		try:
+			result = i.next()
+		except StopIteration:
+			raise ValueError('Empty sequence')
+		try:
+			i.next()
+			raise ValueError('Sequence contains more than one item')
+		except StopIteration:
+			return result
 	
 	def elementat(self, index):
 		for idx, item in enumerate(self):
@@ -188,37 +197,53 @@ if __name__ == '__main__':
 	E = []
 	D = [1.1, 1.2, 3.1, 3.2, 3.3, 3.4, 3.5]
 
-	# restriction
-	assert Q(L) \
-		.where(lambda n: n % 2 == 0) \
-		.tolist() == [2,4,6,8,10], '.where'
+	import unittest
+	class QueryTestCase(unittest.TestCase):
+		def setUp(self):
+			self.L = [1,2,3,4,5,6,7,8,9,10]
+			self.E = []
+			self.D = [1.1, 1.2, 3.1, 3.2, 3.3, 3.4, 3.5]
+	class TestRestriction(QueryTestCase):
+		def test_where(self):
+			assert Query(self.L) \
+				.where(lambda n: n % 2 == 0) \
+				.tolist() == [2, 4, 6, 8, 10]
+	class TestProjection(QueryTestCase):
+		def test_select(self):
+			assert Query(self.L) \
+				.select(lambda n: 2 * n) \
+				.tolist() == [2,4,6,8,10,12,14,16,18,20]
+	class TestPartitioning(QueryTestCase):
+		def test_take(self):
+			assert Query(self.L) \
+				.take(3) \
+				.tolist() == [1,2,3]
+		def test_skip(self):
+			assert Query(self.L) \
+				.skip(7) \
+				.tolist() == [8,9,10]
+		def test_skip_take(self):
+			assert Query(self.L) \
+				.skip(5) \
+				.take(3) \
+				.tolist() == [6,7,8]
+		def test_takewhile(self):
+			assert Query(self.L) \
+				.takewhile(lambda n: n < 4) \
+				.tolist() == [1,2,3]
+		def test_skipwhile(self):
+			assert Query(self.L) \
+				.skipwhile(lambda n: n < 8) \
+				.tolist() == [8,9,10]
+
+
+
+	tests = unittest.TestSuite([ unittest.makeSuite(c, 'test_') for c in [
+		TestRestriction,
+		TestProjection,
+		TestPartitioning]])
+	unittest.TextTestRunner().run(tests)
 	
-	# projection
-	assert Q(L) \
-		.select(lambda n: 2 * n) \
-		.tolist() == [2,4,6,8,10,12,14,16,18,20], '.select'
-	
-	# partitioning
-	assert Query(L) \
-		.take(3) \
-		.tolist() == [1,2,3], '.take'
-
-	assert Query(L) \
-		.skip(7) \
-		.tolist() == [8,9,10], '.skip'
-
-	assert Query(L) \
-		.skip(5) \
-		.take(3) \
-		.tolist() == [6,7,8], '.skip/.take'
-
-	assert Query(L) \
-		.takewhile(lambda n: n < 4) \
-		.tolist() == [1,2,3], '.takewhile'
-
-	assert Query(L) \
-		.skipwhile(lambda n: n < 8) \
-		.tolist() == [8,9,10], '.skipwhile'
 
 	# ordering
 	
