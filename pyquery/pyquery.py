@@ -5,7 +5,6 @@ import itertools
 class Query_Base(object):
 	def __init__(self, iterable):
 		self.iterable = iterable
-	
 	def __iter__(self):
 		return iter(self.iterable)	
 	
@@ -16,7 +15,6 @@ class Query_Restriction(Query_Base):
 class Query_Projection(Query_Base):
 	def select(self, func):
 		return self.__class__(func(item) for item in self)
-	
 	def selectmany(self, seq_selector, result_selector=None):
 		def selectmany_gen(seq_selector, result_selector):
 			for sub_seq in self:
@@ -35,7 +33,6 @@ class Query_Partitioning(Query_Base):
 				yield i.next()
 				count -= 1
 		return self.__class__(take_gen(count))
-	
 	def skip(self, count):
 		def skip_gen(count):
 			i = iter(self)
@@ -45,7 +42,6 @@ class Query_Partitioning(Query_Base):
 			while True:
 				yield i.next()
 		return self.__class__(skip_gen(count))
-	
 	def takewhile(self, pred):
 		def takewhile_gen(pred):
 			i = iter(self)
@@ -55,7 +51,6 @@ class Query_Partitioning(Query_Base):
 					break
 				yield item
 		return self.__class__(takewhile_gen(pred))
-	
 	def skipwhile(self, pred):
 		def skipwhile_gen(pred):
 			i = iter(self)
@@ -69,7 +64,12 @@ class Query_Partitioning(Query_Base):
 		return self.__class__(skipwhile_gen(pred))
 
 class Query_Ordering(Query_Base):
-	pass
+	def orderby(self, key_selector=None):
+		def orderby_gen():
+			for item in sorted(self, key=key_selector):
+				yield item
+		return self.__class__(orderby_gen())
+	thenby = orderby
 
 class Query_Grouping(Query_Base):
 	def groupby(self, key_selector=None, val_selector=None):
@@ -82,16 +82,49 @@ class Query_Grouping(Query_Base):
 				result[k].append(v)
 			except KeyError:
 				result[k] = [v]
-
 		return self.__class__((k, self.__class__(v)) for (k, v) in result.iteritems())
 
 class Query_Sets(Query_Base):
-	pass
+	def distinct(self):
+		def distinct_gen():
+			seen = set()
+			for item in self:
+				if item in seen:
+					continue
+				seen |= set([item])
+				yield item
+		return self.__class__(distinct_gen())
+	def union(self, other):
+		def union_gen():
+			seen = set([])
+			for item in self:
+				if item not in seen:
+					yield item
+					seen |= set([item])
+			for item in other:
+				if item not in seen:
+					yield item
+					seen |= set([item])			
+		return self.__class__(union_gen())
+	def intersect(self, other):
+		def intersect_gen():
+			s2 = set(other)
+			for item in self:
+				if item in s2:
+					yield item
+		return self.__class__(intersect_gen())
+	def difference(self, other):
+		def difference_gen():
+			s2 = set(other)
+			for item in self:
+				if item in s2:
+					continue
+				yield item
+		return self.__class__(difference_gen())
 
 class Query_Conversion(Query_Base):
 	def tolist(self):
 		return list(self)
-	
 	def todict(self, proj1=None, proj2=None):
 		if proj1 and proj2:
 			return self \
@@ -114,13 +147,11 @@ class Query_Elements(Query_Base):
 				return i.next()
 			except StopIteration:
 				raise ValueError('Empty sequence')
-	
 	def firstordefault(self, pred=None, default=None):
 		try:
 			return self.first(pred)
 		except ValueError:
 			return default
-		
 	def last(self, pred=None):
 		if pred:
 			return self.where(pred).last()
@@ -132,13 +163,11 @@ class Query_Elements(Query_Base):
 				return item
 			else:
 				raise ValueError('Empty sequence')
-	
 	def lastordefault(self, pred=None, default=None):
 		try:
 			return self.last(pred)
 		except ValueError:
 			return default
-	
 	def single(self, pred=None):
 		if pred:
 			return self.where(pred).single()
@@ -153,7 +182,6 @@ class Query_Elements(Query_Base):
 				raise ValueError('Sequence contains more than one item')
 			except StopIteration:
 				return result
-	
 	def singleordefault(self, pred=None, default=None):
 		if pred:
 			return self.where(pred).singleordefault(default=default)
@@ -169,7 +197,6 @@ class Query_Elements(Query_Base):
 				raise ValueError('Sequence contains more than one item')
 			except StopIteration:
 				return result
-	
 	def elementat(self, index):
 		for idx, item in enumerate(self):
 			if idx == index:
@@ -188,7 +215,6 @@ class Query_Quantifiers(Query_Base):
 				if item:
 					return True
 			return False
-	
 	def all(self, pred=None):
 		if pred:
 			return self.select(pred).all()
@@ -208,20 +234,17 @@ class Query_Aggregates(Query_Base):
 		if is_empty and not allow_empty:
 			raise ValueError('Empty sequence')
 		return result
-	
 	def sum(self, selector=None):
 		if selector:
 			return self.select(selector).sum()
 		else:
 			return self.aggregate(lambda a, b: a + b, initial=0, allow_empty=False)
-		
 	def average(self, selector=None):
 		if selector:
 			return self.select(selector).average()
 		else:
 			i1, i2 = itertools.tee(self)
 			return float(self.__class__(i1).sum()) / self.__class__(i2).count()
-	
 	def min(self, pred=None):
 		if pred:
 			return self.where(pred).min()
@@ -231,7 +254,6 @@ class Query_Aggregates(Query_Base):
 				if item < lowest:
 					lowest = item
 			return lowest
-	
 	def max(self, pred=None):
 		if pred:
 			return self.where(pred).max()
@@ -241,7 +263,6 @@ class Query_Aggregates(Query_Base):
 				if item > highest:
 					highest = item
 			return highest
-	
 	def count(self, pred=None):
 		if pred:
 			return self.where(pred).count()
@@ -362,7 +383,8 @@ if __name__ == '__main__':
 			self.W1 = ['The quick brown', 'fox jumps over', 'the lazy dogs']
 			self.W2 = [['The', 'quick', 'brown'], ['fox', 'jumps', 'over'], ['the', 'lazy', 'dogs']]
 			self.G  = ['blueberry', 'chimpanzee', 'abacus', 'banana', 'apple', 'cheese']
-			self.R  = [6,10,5,2,8,9,4,1,3,7]
+			self.R1 = [6,10,5,2,8,9,4,1,3,7]
+			self.R2 = [(1,6),(2,10),(3,5),(2,5),(2,9),(1,9),(1,4),(2,1),(3,3),(7,3)]
 			self.S1 = [0,2,4,5,6,8,9]
 			self.S2 = [1,3,5,7,8]
 
@@ -407,8 +429,21 @@ if __name__ == '__main__':
 
 	class TestOrdering(Test):
 		@returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-		def orderby(self):
-			return Query(self.R).orderby(lambda n: n)
+		def orderby_1(self):
+			return Query(self.R1) \
+				.orderby() \
+				.tolist()
+		@returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+		def orderby_2(self):
+			return Query(self.R1) \
+				.orderby(lambda n: n) \
+				.tolist()
+		@returns([])
+		def thenby_1(self):
+			return Query(self.R2) \
+				.orderby(lambda n: n[0]) \
+				.thenby(lambda n: n[1]) \
+				.tolist()
 
 	class TestGrouping(Test):
 		@returns({'b':['blueberry', 'banana'], 'c':['chimpanzee', 'cheese'], 'a':['abacus', 'apple']})
@@ -419,22 +454,22 @@ if __name__ == '__main__':
 				.todict()
 
 	class TestSets(Test):
-		@returns([2, 3, 5])
+		@returns([2,3,5])
 		def distinct(self):
-			return Query([2, 2, 3, 5, 5]) \
+			return Query([2,2,3,5,5]) \
 				.distinct() \
 				.tolist()
-		@returns([0, 2, 4, 5, 6, 8, 9, 1, 3, 2])
+		@returns([0,2,4,5,6,8,9,1,3,7])
 		def union(self):
 			return Query(self.S1) \
 				.union(Query(self.S2)) \
 				.tolist()
-		@returns([5, 8])
+		@returns([5,8])
 		def interect(self):
 			return Query(self.S1) \
 				.intersect(Query(self.S2)) \
 				.tolist()
-		@returns([0, 2, 4, 6, 9])
+		@returns([0,2,4,6,9])
 		def difference(self):
 			return Query(self.S1) \
 				.difference(Query(self.S2)) \
@@ -639,5 +674,10 @@ if __name__ == '__main__':
 		@returns(0)
 		def count_2b(self):
 			return Query(self.L).count(lambda n: n > 10)
+
+	class TestJoins(Test):
+		@returns(None)
+		def join(self):
+			return Query(self.S1).join(self.S2)
 
 	BaseTest.run_all_tests(base_class=Test, g=globals())
