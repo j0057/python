@@ -1,0 +1,116 @@
+TestGeneration
+   dummy
+TestGeneration -- ok: 1/1; failed: 0/1
+
+TestConversion
+   todict_1
+   todict_2
+   todict_3
+TestConversion -- ok: 3/3; failed: 0/3
+
+TestQuantifiers
+   all_1a
+   all_1b
+   all_2a
+   all_2b
+   any_1a
+   any_1b
+   any_2a
+   any_2b
+TestQuantifiers -- ok: 8/8; failed: 0/8
+
+TestPartitioning
+   skip
+   skipwhile
+   take
+   takewhile
+TestPartitioning -- ok: 4/4; failed: 0/4
+
+TestElement
+   elementat_1
+   elementat_2
+   first_1a
+   first_1b
+   first_2a
+   first_2b
+   firstordefault_1
+   firstordefault_2
+   last_1a
+   last_1b
+   last_2a
+   last_2b
+   single_1a
+   single_1b
+   single_1c
+   single_2a
+   single_2b
+   single_2c
+   singleordefault_1a
+   singleordefault_1b
+   singleordefault_1c
+   singleordefault_1d
+   singleordefault_2a
+   singleordefault_2b
+   singleordefault_2c
+   singleordefault_2d
+TestElement -- ok: 26/26; failed: 0/26
+
+TestJoins
+   join raises: AttributeError ('Query' object has no attribute 'join'); expected result: None
+TestJoins -- ok: 0/1; failed: 1/1
+
+TestOrdering
+   orderby_1
+   orderby_2
+   thenby_1 result: [(2, 1), (3, 3), (7, 3), (1, 4), (2, 5), (3, 5), (1, 6), (1, 9), (2, 9), (2, 10)]; expected result: []
+TestOrdering -- ok: 2/3; failed: 1/3
+
+TestRestriction
+   where
+TestRestriction -- ok: 1/1; failed: 0/1
+
+TestGrouping
+   groupby
+TestGrouping -- ok: 1/1; failed: 0/1
+
+TestAggregates
+   aggregate_1
+   aggregate_2
+   aggregate_3
+   average_1a
+   average_1b
+   average_2a
+   average_2b
+   count_1a
+   count_1b
+   count_2a
+   count_2b
+   max_1a
+   max_1b
+   max_2a
+   max_2b
+   min_1a
+   min_1b
+   min_2a
+   min_2b
+   sum_1a
+   sum_1b
+   sum_2a
+   sum_2b
+TestAggregates -- ok: 23/23; failed: 0/23
+
+TestSets
+   difference
+   distinct
+   interect
+   union
+TestSets -- ok: 4/4; failed: 0/4
+
+TestProjection
+   select
+   selectmany_1
+   selectmany_2
+   selectmany_3
+TestProjection -- ok: 4/4; failed: 0/4
+
+ok: 77/79; fail: 2/79; failing: TestJoins, TestOrdering
