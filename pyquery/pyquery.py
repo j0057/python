@@ -676,8 +676,10 @@ if __name__ == '__main__':
 			return Query(self.L).count(lambda n: n > 10)
 
 	class TestJoins(Test):
-		@returns(None)
+		@returns([('AA', 'AB'), ('BA', 'BB'), ('CA', 'CB')])
 		def join(self):
-			return Query(self.S1).join(self.S2)
+			return Query(['AA', 'BA', 'CA']) \
+				.join(['AB', 'BB', 'CB']) \
+				.tolist()
 
 	BaseTest.run_all_tests(base_class=Test, g=globals())
