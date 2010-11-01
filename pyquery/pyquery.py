@@ -176,13 +176,6 @@ class Query_Elements(Query_Base):
 				return item
 		raise IndexError('No item with index {0}'.format(index))
 	
-	#def isempty(self):
-	#	try:
-	#		iter(self).next()
-	#		return False
-	#	except StopIteration:
-	#		return True
-
 class Query_Generation(Query_Base):
 	pass
 
@@ -276,14 +269,15 @@ if __name__ == '__main__':
 		def __init__(self, func):
 			self.func = func
 			self.__name__ = self.func.__name__
-		def __get__(self, obj, type=None):
+		def __get__(self, object, type=None):
 			if type is None:
 				return self
-			new_func = self.func.__get__(obj, type)
+			new_func = self.func.__get__(object, type)
 			return self.__class__(new_func)
 
 	def returns(value):
 		class returns_dec(BaseDec):
+			is_test = True
 			def __call__(self, *a, **k):
 				try:
 					result = self.func(*a, **k)
@@ -298,7 +292,8 @@ if __name__ == '__main__':
 		return returns_dec
 
 	def raises(exception_type):
-		class raises_dec(func):
+		class raises_dec(BaseDec):
+			is_test = True
 			def __call__(self, *a, **k):
 				try:
 					result = self.func(*a, **k)
@@ -311,419 +306,338 @@ if __name__ == '__main__':
 						'raises: {0} ({1}); expected exception: {2}'.format(type(ex).__name__, str(ex), exception_type.__name__)
 		return raises_dec
 
-	def run_tests(functions=None, test_prefix='test_'):
-		if functions is None:
-			g = globals()
-			functions = [ g[name]
-				for name in sorted(globals().keys())
-				if name.startswith(test_prefix) 
-				if callable(g[name]) ]
-		tests_ok = 0
-		tests_fail = 0
-		for function in functions:
-			print function.__name__,
-			try:
-				result = function()
+	class BaseTest(object):
+		@staticmethod
+		def run_all_tests(base_class, g=None):
+			if g is None: g = globals()
+			BaseTest.run_tests(*[ obj
+				for obj in g.itervalues()
+				if isinstance(obj, type)
+				if base_class in obj.__bases__ ])
+		@staticmethod
+		def run_tests(*classes):
+			tests_ok, tests_fail, tests_ran, failed = 0, 0, 0, []
+			for class_ in classes:
+				print class_.__name__
+				ok, fail, ran = class_().run()
+				tests_ok += ok
+				tests_fail += fail
+				tests_ran += ran
+				if fail:
+					failed += [class_.__name__]
 				print
-				tests_ok += 1
-			except Exception as ex:
-				print ex
-				tests_fail += 1
-		print 'ok: {0}/{2}; failed: {1}/{2}'.format(tests_ok, tests_fail, len(functions))
-
-	import math
-	
-	L  = [1,2,3,4,5,6,7,8,9,10]
-	M  = [4,5,6]
-	E  = []
-	D  = [1.1, 1.2, 3.1, 3.2, 3.3, 3.4, 3.5]
-	W1 = ['The quick brown', 'fox jumps over', 'the lazy dogs']
-	W2 = [['The', 'quick', 'brown'], ['fox', 'jumps', 'over'], ['the', 'lazy', 'dogs']]
-	G  = ['blueberry', 'chimpanzee', 'abacus', 'banana', 'apple', 'cheese']
-	R  = [6,10,5,2,8,9,4,1,3,7]
-	S1 = [0,2,4,5,6,8,9]
-	S2 = [1,3,5,7,8]
+			print 'ok: {0}/{2}; fail: {1}/{2}; failing: {3}'.format(
+				tests_ok,
+				tests_fail,
+				tests_ran,
+				', '.join(failed))
+		def run(self):
+			methods = [ getattr(self, name)
+				for name in sorted(dir(self))
+				#if name.startswith('test_')
+				if callable(getattr(self, name)) 
+				if hasattr(getattr(self, name), 'is_test') ]
+			tests_ok = 0
+			tests_fail = 0
+			tests_total = len(methods)
+			for method in methods:
+				print '  ', method.__name__,
+				try:
+					result = method()
+					print
+					tests_ok += 1
+				except Exception as ex:
+					print ex
+					tests_fail += 1
+			print '{0} -- ok: {1}/{3}; failed: {2}/{3}'.format(
+				type(self).__name__, tests_ok, tests_fail, tests_total)
+			return tests_ok, tests_fail, tests_total			
 		
-	# Query_Restriction.where
-
-	@returns([2, 4, 6, 8, 10])
-	def test_restriction_where():
-		return Query(L).where(lambda n: n % 2 == 0).tolist()
-
-	# Query_Projection.select
-
-	@returns([2, 4, 6, 8, 10, 12, 14, 16, 18, 20])
-	def test_projection_select():
-		return Query(L).select(lambda n: n * 2).tolist()
-
-	# Query_Projection.selectmany
-
-	@returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
-	def test_projection_selectmany_1():
-		return Query(W1) \
-			.selectmany(lambda s: s.split(' ')) \
-			.tolist()
-
-	@returns(['he', 'uick', 'rown', 'ox', 'umps', 'ver', 'he', 'azy', 'ogs'])
-	def test_projection_selectmany_2():
-		return Query(W1) \
-			.selectmany(lambda s: s.split(' '), lambda s: s[1:]) \
-			.tolist()
-
-	@returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
-	def test_projection_selectmany_3():
-		return Query(W2) \
-			.selectmany(lambda sx: sx) \
-			.tolist()
-
-	# Query_Partitioning.take
-
-	@returns([1, 2, 3])
-	def test_partitioning_take():
-		return Query(L).take(3).tolist()
-
-	# Query_Partitioning.skip
-
-	@returns([8, 9, 10])
-	def test_partitioning_skip():
-		return Query(L).skip(7).tolist()
-
-	# Query_Partitioning.takewhile
-
-	@returns([1, 2, 3])
-	def test_partitioning_takewhile():
-		return Query(L).takewhile(lambda n: n < 4).tolist()
-
-	# Query_Partitioning.skipwhile
-
-	@returns([8, 9, 10])
-	def test_partitioning_skipwhile():
-		return Query(L).skipwhile(lambda n: n < 8).tolist()
-
-	# Query_Ordering.orderby
-	
-	@returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-	def test_ordering_orderby():
-		return Query(R).orderby(lambda n: n)
-
-	# Query_Grouping.groupby
-
-	@returns({'b':['blueberry', 'banana'], 'c':['chimpanzee', 'cheese'], 'a':['abacus', 'apple']})
-	def test_grouping_groupby():
-		return Query(G) \
-			.groupby(lambda s: s[0]) \
-			.select(lambda (key, items): (key, items.tolist())) \
-			.todict()
-
-	# Query_Sets.distinct
-	
-	@returns([2, 3, 5])
-	def test_sets_distinct():
-		return Query([2, 2, 3, 5, 5]) \
-			.distinct() \
-			.tolist()
-	
-	# Query_Sets.union
-	
-	@returns([0, 2, 4, 5, 6, 8, 9, 1, 3, 2])
-	def test_sets_union():
-		return Query(S1) \
-			.union(Query(S2)) \
-			.tolist()
-	
-	# Query_Sets.intersect
-	
-	@returns([5, 8])
-	def test_sets_interect():
-		return Query(S1) \
-			.intersect(Query(S2)) \
-			.tolist()
-		
-	# Query_Sets.difference
-	
-	@returns([0, 2, 4, 6, 9])
-	def test_sets_difference():
-		return Query(S1) \
-			.difference(Query(S2)) \
-			.tolist()
-
-	# Query_Conversion.todict
-
-	@returns({1:2, 2:4, 3:6, 4:8})
-	def test_conversion_todict_1():
-		return Query(L) \
-			.where(lambda n: n <= 4) \
-			.select(lambda n: (n, 2*n)) \
-			.todict()
-
-	@returns({1:2, 2:4, 3:6, 4:8})
-	def test_conversion_todict_2():
-		return Query(L) \
-			.where(lambda n: n <= 4) \
-			.todict(lambda n: 2 * n)
-
-	@returns({2:3, 4:6, 6:9, 8:12})
-	def test_conversion_todict_3():
-		return Query(L) \
-			.where(lambda n: n <= 4) \
-			.todict(lambda n: 2 * n, lambda n: 3 * n)
-
-	# Query_Element.elementat
-
-	@returns(1)
-	def test_element_elementat_1():
-		return Query(L).elementat(0)
-
-	@returns(10)
-	def test_element_elementat_2():
-		return Query(L).elementat(9)
-
-	# Query_Element.first
-
-	@returns(1)
-	def test_element_first_1a():
-		return Query(L).first()
-
-	@raises(ValueError)
-	def test_element_first_1b():
-		return Query(E).first()
-
-	@returns(3.1)
-	def test_element_first_2a():
-		return Query(D).first(lambda n: 3 <= n <= 4)
-
-	@raises(ValueError)
-	def test_element_first_2b():
-		return Query(E).first(lambda n: 3 <= n <= 4)
-
-	# Query_Element.last
-
-	@returns(10)
-	def test_element_last_1a():
-		return Query(L).last()
-
-	@raises(ValueError)
-	def test_element_last_1b():
-		return Query(E).last()
-
-	@returns(3.5)
-	def test_element_last_2a():
-		return Query(D).last(lambda n: 3 <= n <= 4)
-
-	@raises(ValueError)
-	def test_element_last_2b():
-		return Query(E).last(lambda n: 3 <= n <= 4)
-
-	# Query_Element.firstordefault
-
-	@returns(1)
-	def test_element_firstordefault_1():
-		return Query(L).firstordefault()
-
-	@returns(42)
-	def test_element_firstordefault_2():
-		return Query(E).firstordefault(default=42)
-
-	# Query_Element.single
-
-	@returns(4)
-	def test_element_single_1a():
-		return Query(L).where(lambda n: n == 4).single()
-
-	@raises(ValueError)
-	def test_element_single_1b():
-		return Query(L).where(lambda n: n < 4).single()
-
-	@raises(ValueError)
-	def test_element_single_1c():
-		return Query(L).where(lambda n: n >= 4).single()
-
-	@returns(4)
-	def test_element_single_2a():
-		return Query(L).single(lambda n: n == 4)
-
-	@raises(ValueError)
-	def test_element_single_2b():
-		return Query(L).single(lambda n: n < 4)
-
-	@raises(ValueError)
-	def test_element_single_2c():
-		return Query(L).single(lambda n: n >= 4)
-
-	# Query_Element.singleordefault
-
-	@returns(4)
-	def test_element_singleordefault_1a():
-		return Query(L).where(lambda n: n == 4).singleordefault(default=42)
-
-	@returns(42)
-	def test_element_singleordefault_1b():
-		return Query(L).where(lambda n: n > 10).singleordefault(default=42)
-
-	@raises(ValueError)
-	def test_element_singleordefault_1c():
-		return Query(L).where(lambda n: n < 4).singleordefault(default=42)
-
-	@raises(ValueError)
-	def test_element_singleordefault_1d():
-		return Query(L).where(lambda n: n >= 4).singleordefault(default=42)
-
-	@returns(4)
-	def test_element_singleordefault_2a():
-		return Query(L).singleordefault(lambda n: n == 4, default=42)
-
-	@returns(42)
-	def test_element_singleordefault_2b():
-		return Query(L).singleordefault(lambda n: n > 10, default=42)
-
-	@raises(ValueError)
-	def test_element_singleordefault_2c():
-		return Query(L).singleordefault(lambda n: n < 4, default=42)
-
-	@raises(ValueError)
-	def test_element_singleordefault_2d():
-		return Query(L).singleordefault(lambda n: n >= 4, default=42)
-
-	# TODO: Query_Generation
-
-	# Query_Quantifiers.any
-	
-	@returns(True)
-	def test_quantifiers_any_1a():
-		return Query([False, False, True]).any()
-
-	@returns(False)
-	def test_quantifiers_any_1b():
-		return Query([False, False, False]).any()
-	
-	@returns(True)
-	def test_quantifiers_any_2a():
-		return Query(L).any(lambda n: n <= 1)
-	
-	@returns(False)
-	def test_quantifiers_any_2b():
-		return Query(L).any(lambda n: n < 1)
-
-	# Query_Quantifiers.all
-	
-	@returns(True)
-	def test_quantifiers_all_1a():
-		return Query([True, True, True]).all()
-	
-	@returns(False)
-	def test_quantifiers_all_1b():
-		return Query([True, True, False]).all()
-		
-	@returns(True)
-	def test_quantifiers_all_2a():
-		return Query(L).all(lambda n: n > 0)
-	
-	@returns(False)
-	def test_quantifiers_all_2b():
-		return Query(L).all(lambda n: n > 1)
-			
-	# Query_Aggregates.aggregate
-
-	@returns(55)
-	def test_aggregates_aggregate_1():
-		return Query(L).aggregate(lambda a,b: a + b, initial=0)
-
-	@returns(3628800)
-	def test_aggregates_aggregate_2():
-		return Query(L).aggregate(lambda a,b: a * b, initial=1)
-
-	@raises(TypeError)
-	def test_aggregates_aggregate_3():
-		return Query(L).aggregate(lambda a,b: a + b)
-
-	# Query_Aggregates.sum
-	
-	@returns(55)
-	def test_aggregates_sum_1a():
-		return Query(L).sum()
-	
-	@raises(ValueError)
-	def test_aggregates_sum_1b():
-		return Query(E).sum()
-		
-	@returns(110)
-	def test_aggregates_sum_2a():
-		return Query(L).sum(lambda n: 2 * n)
-	
-	@raises(ValueError)
-	def test_aggregates_sum_2b():
-		return Query(E).sum(lambda n: 2 * n)
-
-	# Query_Aggregates.average
-	
-	@returns(5.5)
-	def test_aggregates_average_1a():
-		return Query(L).average()
-	
-	@raises(ValueError)
-	def test_aggregates_average_1b():
-		return Query(E).average()
-	
-	@returns(11)
-	def test_aggregates_average_2a():
-		return Query(L).average(lambda n: 2 * n)
-	
-	@raises(ValueError)
-	def test_aggregates_average_2b():
-		return Query(E).average(lambda n: 2 * n)
-
-	# Query_Aggregates.min
-
-	@returns(1)
-	def test_aggregates_min_1a():
-		return Query(L).min()
-
-	@raises(ValueError)
-	def test_aggregates_min_1b():
-		return Query(E).min()
-
-	@returns(5)
-	def test_aggregates_min_2a():
-		return Query(L).min(lambda n: n >= 5)
-
-	@raises(ValueError)
-	def test_aggregates_min_2b():
-		return Query(E).min(lambda n: n >= 5)
-
-	# Query_Aggregates.max
-
-	@returns(10)
-	def test_aggregates_max_1a():
-		return Query(L).max()
-
-	@raises(ValueError)
-	def test_aggregates_max_1b():
-		return Query(E).max()
-
-	@returns(5)
-	def test_aggregates_max_2a():
-		return Query(L).max(lambda n: n <= 5)
-
-	@raises(ValueError)
-	def test_aggregates_max_2b():
-		return Query(E).max(lambda n: n <= 5)
-
-	# Query_Aggregates.count
-
-	@returns(5)
-	def test_aggregates_count_1a():
-		return Query(L).where(lambda n: n <= 5).count()
-
-	@returns(0)
-	def test_aggregates_count_1b():
-		return Query(L).where(lambda n: n > 10).count()
-
-	@returns(5)
-	def test_aggregates_count_2a():
-		return Query(L).count(lambda n: n <= 5)
-
-	@returns(0)
-	def test_aggregates_count_2b():
-		return Query(L).count(lambda n: n > 10)
-
-	run_tests()
+	class Test(BaseTest):
+		def __init__(self):
+			self.L  = [1,2,3,4,5,6,7,8,9,10]
+			self.M  = [4,5,6]
+			self.E  = []
+			self.D  = [1.1, 1.2, 3.1, 3.2, 3.3, 3.4, 3.5]
+			self.W1 = ['The quick brown', 'fox jumps over', 'the lazy dogs']
+			self.W2 = [['The', 'quick', 'brown'], ['fox', 'jumps', 'over'], ['the', 'lazy', 'dogs']]
+			self.G  = ['blueberry', 'chimpanzee', 'abacus', 'banana', 'apple', 'cheese']
+			self.R  = [6,10,5,2,8,9,4,1,3,7]
+			self.S1 = [0,2,4,5,6,8,9]
+			self.S2 = [1,3,5,7,8]
+
+	class TestRestriction(Test):
+		@returns([2, 4, 6, 8, 10])
+		def where(self):
+			return Query(self.L).where(lambda n: n % 2 == 0).tolist()
+
+	class TestProjection(Test):
+		@returns([2, 4, 6, 8, 10, 12, 14, 16, 18, 20])
+		def select(self):
+			return Query(self.L).select(lambda n: n * 2).tolist()
+		@returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
+		def selectmany_1(self):
+			return Query(self.W1) \
+				.selectmany(lambda s: s.split(' ')) \
+				.tolist()
+		@returns(['he', 'uick', 'rown', 'ox', 'umps', 'ver', 'he', 'azy', 'ogs'])
+		def selectmany_2(self):
+			return Query(self.W1) \
+				.selectmany(lambda s: s.split(' '), lambda s: s[1:]) \
+				.tolist()
+		@returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
+		def selectmany_3(self):
+			return Query(self.W2) \
+				.selectmany(lambda sx: sx) \
+				.tolist()
+
+	class TestPartitioning(Test):
+		@returns([1, 2, 3])
+		def take(self):
+			return Query(self.L).take(3).tolist()
+		@returns([8, 9, 10])
+		def skip(self):
+			return Query(self.L).skip(7).tolist()
+		@returns([1, 2, 3])
+		def takewhile(self):
+			return Query(self.L).takewhile(lambda n: n < 4).tolist()
+		@returns([8, 9, 10])
+		def skipwhile(self):
+			return Query(self.L).skipwhile(lambda n: n < 8).tolist()
+
+	class TestOrdering(Test):
+		@returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+		def orderby(self):
+			return Query(self.R).orderby(lambda n: n)
+
+	class TestGrouping(Test):
+		@returns({'b':['blueberry', 'banana'], 'c':['chimpanzee', 'cheese'], 'a':['abacus', 'apple']})
+		def groupby(self):
+			return Query(self.G) \
+				.groupby(lambda s: s[0]) \
+				.select(lambda (key, items): (key, items.tolist())) \
+				.todict()
+
+	class TestSets(Test):
+		@returns([2, 3, 5])
+		def distinct(self):
+			return Query([2, 2, 3, 5, 5]) \
+				.distinct() \
+				.tolist()
+		@returns([0, 2, 4, 5, 6, 8, 9, 1, 3, 2])
+		def union(self):
+			return Query(self.S1) \
+				.union(Query(self.S2)) \
+				.tolist()
+		@returns([5, 8])
+		def interect(self):
+			return Query(self.S1) \
+				.intersect(Query(self.S2)) \
+				.tolist()
+		@returns([0, 2, 4, 6, 9])
+		def difference(self):
+			return Query(self.S1) \
+				.difference(Query(self.S2)) \
+				.tolist()
+
+	class TestConversion(Test):
+		@returns({1:2, 2:4, 3:6, 4:8})
+		def todict_1(self):
+			return Query(self.L) \
+				.where(lambda n: n <= 4) \
+				.select(lambda n: (n, 2*n)) \
+				.todict()
+		@returns({1:2, 2:4, 3:6, 4:8})
+		def todict_2(self):
+			return Query(self.L) \
+				.where(lambda n: n <= 4) \
+				.todict(lambda n: 2 * n)
+		@returns({2:3, 4:6, 6:9, 8:12})
+		def todict_3(self):
+			return Query(self.L) \
+				.where(lambda n: n <= 4) \
+				.todict(lambda n: 2 * n, lambda n: 3 * n)
+
+	class TestElement(Test):
+		@returns(1)
+		def elementat_1(self):
+			return Query(self.L).elementat(0)
+		@returns(10)
+		def elementat_2(self):
+			return Query(self.L).elementat(9)
+		@returns(1)
+		def first_1a(self):
+			return Query(self.L).first()
+		@raises(ValueError)
+		def first_1b(self):
+			return Query(self.E).first()
+		@returns(3.1)
+		def first_2a(self):
+			return Query(self.D).first(lambda n: 3 <= n <= 4)
+		@raises(ValueError)
+		def first_2b(self):
+			return Query(self.E).first(lambda n: 3 <= n <= 4)
+		@returns(10)
+		def last_1a(self):
+			return Query(self.L).last()
+		@raises(ValueError)
+		def last_1b(self):
+			return Query(self.E).last()
+		@returns(3.5)
+		def last_2a(self):
+			return Query(self.D).last(lambda n: 3 <= n <= 4)
+		@raises(ValueError)
+		def last_2b(self):
+			return Query(self.E).last(lambda n: 3 <= n <= 4)
+		@returns(1)
+		def firstordefault_1(self):
+			return Query(self.L).firstordefault()
+		@returns(42)
+		def firstordefault_2(self):
+			return Query(self.E).firstordefault(default=42)
+		@returns(4)
+		def single_1a(self):
+			return Query(self.L).where(lambda n: n == 4).single()
+		@raises(ValueError)
+		def single_1b(self):
+			return Query(self.L).where(lambda n: n < 4).single()
+		@raises(ValueError)
+		def single_1c(self):
+			return Query(self.L).where(lambda n: n >= 4).single()
+		@returns(4)
+		def single_2a(self):
+			return Query(self.L).single(lambda n: n == 4)
+		@raises(ValueError)
+		def single_2b(self):
+			return Query(self.L).single(lambda n: n < 4)
+		@raises(ValueError)
+		def single_2c(self):
+			return Query(self.L).single(lambda n: n >= 4)
+		@returns(4)
+		def singleordefault_1a(self):
+			return Query(self.L).where(lambda n: n == 4).singleordefault(default=42)
+		@returns(42)
+		def singleordefault_1b(self):
+			return Query(self.L).where(lambda n: n > 10).singleordefault(default=42)
+		@raises(ValueError)
+		def singleordefault_1c(self):
+			return Query(self.L).where(lambda n: n < 4).singleordefault(default=42)
+		@raises(ValueError)
+		def singleordefault_1d(self):
+			return Query(self.L).where(lambda n: n >= 4).singleordefault(default=42)
+		@returns(4)
+		def singleordefault_2a(self):
+			return Query(self.L).singleordefault(lambda n: n == 4, default=42)
+		@returns(42)
+		def singleordefault_2b(self):
+			return Query(self.L).singleordefault(lambda n: n > 10, default=42)
+		@raises(ValueError)
+		def singleordefault_2c(self):
+			return Query(self.L).singleordefault(lambda n: n < 4, default=42)
+		@raises(ValueError)
+		def singleordefault_2d(self):
+			return Query(self.L).singleordefault(lambda n: n >= 4, default=42)
+
+	class TestGeneration(Test):
+		@returns(None)
+		def dummy(self):
+			pass
+
+	class TestQuantifiers(Test):
+		@returns(True)
+		def any_1a(self):
+			return Query([False, False, True]).any()
+		@returns(False)
+		def any_1b(self):
+			return Query([False, False, False]).any()
+		@returns(True)
+		def any_2a(self):
+			return Query(self.L).any(lambda n: n <= 1)
+		@returns(False)
+		def any_2b(self):
+			return Query(self.L).any(lambda n: n < 1)
+		@returns(True)
+		def all_1a(self):
+			return Query([True, True, True]).all()
+		@returns(False)
+		def all_1b(self):
+			return Query([True, True, False]).all()
+		@returns(True)
+		def all_2a(self):
+			return Query(self.L).all(lambda n: n > 0)
+		@returns(False)
+		def all_2b(self):
+			return Query(self.L).all(lambda n: n > 1)
+
+	class TestAggregates(Test):
+		@returns(55)
+		def aggregate_1(self):
+			return Query(self.L).aggregate(lambda a,b: a + b, initial=0)
+		@returns(3628800)
+		def aggregate_2(self):
+			return Query(self.L).aggregate(lambda a,b: a * b, initial=1)
+		@raises(TypeError)
+		def aggregate_3(self):
+			return Query(self.L).aggregate(lambda a,b: a + b)
+		@returns(55)
+		def sum_1a(self):
+			return Query(self.L).sum()
+		@raises(ValueError)
+		def sum_1b(self):
+			return Query(self.E).sum()
+		@returns(110)
+		def sum_2a(self):
+			return Query(self.L).sum(lambda n: 2 * n)
+		@raises(ValueError)
+		def sum_2b(self):
+			return Query(self.E).sum(lambda n: 2 * n)
+		@returns(5.5)
+		def average_1a(self):
+			return Query(self.L).average()
+		@raises(ValueError)
+		def average_1b(self):
+			return Query(self.E).average()
+		@returns(11)
+		def average_2a(self):
+			return Query(self.L).average(lambda n: 2 * n)
+		@raises(ValueError)
+		def average_2b(self):
+			return Query(self.E).average(lambda n: 2 * n)
+		@returns(1)
+		def min_1a(self):
+			return Query(self.L).min()
+		@raises(ValueError)
+		def min_1b(self):
+			return Query(self.E).min()
+		@returns(5)
+		def min_2a(self):
+			return Query(self.L).min(lambda n: n >= 5)
+		@raises(ValueError)
+		def min_2b(self):
+			return Query(self.E).min(lambda n: n >= 5)
+		@returns(10)
+		def max_1a(self):
+			return Query(self.L).max()
+		@raises(ValueError)
+		def max_1b(self):
+			return Query(self.E).max()
+		@returns(5)
+		def max_2a(self):
+			return Query(self.L).max(lambda n: n <= 5)
+		@raises(ValueError)
+		def max_2b(self):
+			return Query(self.E).max(lambda n: n <= 5)
+		@returns(5)
+		def count_1a(self):
+			return Query(self.L).where(lambda n: n <= 5).count()
+		@returns(0)
+		def count_1b(self):
+			return Query(self.L).where(lambda n: n > 10).count()
+		@returns(5)
+		def count_2a(self):
+			return Query(self.L).count(lambda n: n <= 5)
+		@returns(0)
+		def count_2b(self):
+			return Query(self.L).count(lambda n: n > 10)
+
+	BaseTest.run_all_tests(base_class=Test, g=globals())
