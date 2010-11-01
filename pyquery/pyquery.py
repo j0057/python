@@ -72,12 +72,6 @@ class Query_Ordering(Query_Base):
 	pass
 
 class Query_Grouping(Query_Base):
-	#def groupby(self, key_selector=None):
-	#	def groupby_gen(key_selector):
-	#		for (key, values) in itertools.groupby(self, key_selector):
-	#			yield (key, self.__class__(values))
-	#	return self.__class__(groupby_gen(key_selector))
-	
 	def groupby(self, key_selector=None, val_selector=None):
 		result = {} # this is greedy...but there's no other way to do it other than returning the same key
 					# multiple times.
@@ -181,25 +175,59 @@ class Query_Elements(Query_Base):
 			if idx == index:
 				return item
 		raise IndexError('No item with index {0}'.format(index))
+	
+	#def isempty(self):
+	#	try:
+	#		iter(self).next()
+	#		return False
+	#	except StopIteration:
+	#		return True
 
 class Query_Generation(Query_Base):
 	pass
 
 class Query_Quantifiers(Query_Base):
-	pass
+	def any(self, pred=None):
+		if pred:
+			return self.select(pred).any()
+		else:
+			for item in self:
+				if item:
+					return True
+			return False
+	
+	def all(self, pred=None):
+		if pred:
+			return self.select(pred).all()
+		else:
+			for item in self:
+				if not item:
+					return False
+			return True
 
 class Query_Aggregates(Query_Base):
-	def aggregate(self, func, initial=None):
+	def aggregate(self, func, initial=None, allow_empty=True):
 		result = initial
+		is_empty = True
 		for item in self:
+			is_empty = False
 			result = func(result, item)
+		if is_empty and not allow_empty:
+			raise ValueError('Empty sequence')
 		return result
 	
-	def sum(self):
-		return self.aggregate(lambda a, b: a + b)
+	def sum(self, selector=None):
+		if selector:
+			return self.select(selector).sum()
+		else:
+			return self.aggregate(lambda a, b: a + b, initial=0, allow_empty=False)
 		
-	def average(self):
-		return float(self.sum()) / self.count()
+	def average(self, selector=None):
+		if selector:
+			return self.select(selector).average()
+		else:
+			i1, i2 = itertools.tee(self)
+			return float(self.__class__(i1).sum()) / self.__class__(i2).count()
 	
 	def min(self, pred=None):
 		if pred:
@@ -244,37 +272,43 @@ class Query(Query_Restriction, Query_Projection, Query_Partitioning, Query_Order
 Q = Query
 
 if __name__ == '__main__':
+	class BaseDec(object):
+		def __init__(self, func):
+			self.func = func
+			self.__name__ = self.func.__name__
+		def __get__(self, obj, type=None):
+			if type is None:
+				return self
+			new_func = self.func.__get__(obj, type)
+			return self.__class__(new_func)
+
 	def returns(value):
-		def returns_dec(func):
-			def returns_func():
+		class returns_dec(BaseDec):
+			def __call__(self, *a, **k):
 				try:
-					result = func()
+					result = self.func(*a, **k)
 					assert result == value, \
 						'result: {0}; expected result: {1}'.format(result, value)
+					return result
 				except AssertionError:
 					raise
 				except Exception as ex:
 					assert False, \
-						'raises: {0} - {1}; expected result: {2}'.format(type(ex).__name__, str(ex), value)
-			returns_func.__name__ = func.__name__
-			return returns_func
+						'raises: {0} ({1}); expected result: {2}'.format(type(ex).__name__, str(ex), value)	
 		return returns_dec
 
 	def raises(exception_type):
-		def raises_dec(func):
-			#functools.decorator(func)
-			def raises_func():
+		class raises_dec(func):
+			def __call__(self, *a, **k):
 				try:
-					result = func()
+					result = self.func(*a, **k)
 					assert False, \
-						'result: {0}; expected exception: {1}'.format(result, exception_type)
+						'result: {0}; expected exception: {1}'.format(result, exception_type.__name__)
 				except AssertionError:
 					raise
 				except Exception as ex:
 					assert type(ex) == exception_type, \
-						'raises: {0} - {1}; expected exception: {2}'.format(type(ex).__name__, str(ex), exception_type)
-			raises_func.__name__ = func.__name__
-			return raises_func
+						'raises: {0} ({1}); expected exception: {2}'.format(type(ex).__name__, str(ex), exception_type.__name__)
 		return raises_dec
 
 	def run_tests(functions=None, test_prefix='test_'):
@@ -366,7 +400,8 @@ if __name__ == '__main__':
 	def test_partitioning_skipwhile():
 		return Query(L).skipwhile(lambda n: n < 8).tolist()
 
-	# TODO: Query_Ordering
+	# Query_Ordering.orderby
+	
 	@returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 	def test_ordering_orderby():
 		return Query(R).orderby(lambda n: n)
@@ -409,7 +444,7 @@ if __name__ == '__main__':
 	@returns([0, 2, 4, 6, 9])
 	def test_sets_difference():
 		return Query(S1) \
-			.intersect(Query(S2)) \
+			.difference(Query(S2)) \
 			.tolist()
 
 	# Query_Conversion.todict
@@ -559,7 +594,7 @@ if __name__ == '__main__':
 
 	@returns(False)
 	def test_quantifiers_any_1b():
-		return Query([False, False, True]).any()
+		return Query([False, False, False]).any()
 	
 	@returns(True)
 	def test_quantifiers_any_2a():
@@ -589,11 +624,11 @@ if __name__ == '__main__':
 			
 	# Query_Aggregates.aggregate
 
-	@returns(sum(range(1,11)))
+	@returns(55)
 	def test_aggregates_aggregate_1():
 		return Query(L).aggregate(lambda a,b: a + b, initial=0)
 
-	@returns(math.factorial(10))
+	@returns(3628800)
 	def test_aggregates_aggregate_2():
 		return Query(L).aggregate(lambda a,b: a * b, initial=1)
 
@@ -601,8 +636,9 @@ if __name__ == '__main__':
 	def test_aggregates_aggregate_3():
 		return Query(L).aggregate(lambda a,b: a + b)
 
-	# TODO: Query_Aggregates.sum
-	@returns(sum(range(1, 11)))
+	# Query_Aggregates.sum
+	
+	@returns(55)
 	def test_aggregates_sum_1a():
 		return Query(L).sum()
 	
@@ -610,7 +646,7 @@ if __name__ == '__main__':
 	def test_aggregates_sum_1b():
 		return Query(E).sum()
 		
-	@returns(sum(range(2, 22, 2)))
+	@returns(110)
 	def test_aggregates_sum_2a():
 		return Query(L).sum(lambda n: 2 * n)
 	
@@ -618,7 +654,23 @@ if __name__ == '__main__':
 	def test_aggregates_sum_2b():
 		return Query(E).sum(lambda n: 2 * n)
 
-	# TODO: Query_Aggregates.average
+	# Query_Aggregates.average
+	
+	@returns(5.5)
+	def test_aggregates_average_1a():
+		return Query(L).average()
+	
+	@raises(ValueError)
+	def test_aggregates_average_1b():
+		return Query(E).average()
+	
+	@returns(11)
+	def test_aggregates_average_2a():
+		return Query(L).average(lambda n: 2 * n)
+	
+	@raises(ValueError)
+	def test_aggregates_average_2b():
+		return Query(E).average(lambda n: 2 * n)
 
 	# Query_Aggregates.min
 
