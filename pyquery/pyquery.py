@@ -412,6 +412,12 @@ if __name__ == '__main__':
             return Query(self.W2) \
                 .selectmany(lambda sx: sx) \
                 .tolist()
+        @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
+        def selectmany_4(self):
+            return Query(self.W1) \
+                .select(lambda s: s.split(' ')) \
+                .selectmany() \
+                .tolist()
 
     class TestPartitioning(Test):
         @returns([1, 2, 3])
