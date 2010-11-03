@@ -17,7 +17,9 @@ TestQuantifiers
    any_1b
    any_2a
    any_2b
-TestQuantifiers -- ok: 8/8; failed: 0/8
+   contains_1 raises: AttributeError ('Query' object has no attribute 'contains'); expected result: True
+   contains_2 raises: AttributeError ('Query' object has no attribute 'contains'); expected result: False
+TestQuantifiers -- ok: 8/10; failed: 2/10
 
 TestPartitioning
    skip
@@ -99,6 +101,19 @@ TestAggregates
    sum_2b
 TestAggregates -- ok: 23/23; failed: 0/23
 
+TestMisc
+   concat raises: AttributeError ('Query' object has no attribute 'concat'); expected result: [1, 2, 3, 4, 5, 6]
+   defaultifempty_1 raises: AttributeError ('Query' object has no attribute 'defaultifempty'); expected result: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+   defaultifempty_2 raises: AttributeError ('Query' object has no attribute 'defaultifempty'); expected result: [42]
+   elementatordefault_1 raises: AttributeError ('Query' object has no attribute 'elementatordefault'); expected result: 1
+   elementatordefault_2 raises: AttributeError ('Query' object has no attribute 'elementatordefault'); expected result: 42
+   oftype raises: AttributeError ('Query' object has no attribute 'oftype'); expected result: ['Foo', 'Bar']
+   repeat raises: AttributeError (type object 'Query' has no attribute 'repeat'); expected result: [6, 6, 6]
+   reversed raises: AttributeError ('Query' object has no attribute 'reversed'); expected result: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+   sequenceequal raises: AttributeError ('Query' object has no attribute 'sequenceequal'); expected result: True
+   zip raises: AttributeError ('Query' object has no attribute 'zip'); expected result: [(1, 3), (2, 4), (3, 5)]
+TestMisc -- ok: 0/10; failed: 10/10
+
 TestSets
    difference
    distinct
@@ -111,6 +126,7 @@ TestProjection
    selectmany_1
    selectmany_2
    selectmany_3
-TestProjection -- ok: 4/4; failed: 0/4
+   selectmany_4 raises: TypeError (selectmany() takes at least 2 arguments (1 given)); expected result: ['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs']
+TestProjection -- ok: 4/5; failed: 1/5
 
-ok: 77/79; fail: 2/79; failing: TestJoins, TestOrdering
+ok: 77/92; fail: 15/92; failing: TestQuantifiers, TestJoins, TestOrdering, TestMisc, TestProjection
