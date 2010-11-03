@@ -719,6 +719,12 @@ if __name__ == '__main__':
         @returns([(1,3),(2,4),(3,5)])
         def zip(self):
             return Query([1,2,3]).zip([4,5,6], lambda a,b: (a,b))
+        @returns([6,6,6])
+        def repeat(self):
+            return Query.repeat(6).take(3).tolist()
+        @returns(True)
+        def sequenceequal(self):
+            return Query(self.L).sequenceequal(self.L)
 
 
 
