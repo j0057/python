@@ -609,6 +609,12 @@ if __name__ == '__main__':
         @returns(False)
         def all_2b(self):
             return Query(self.L).all(lambda n: n > 1)
+        @returns(True)
+        def contains_1(self):
+            return Query(self.L).contains(1)
+        @returns(False)
+        def contains_2(self):
+            return Query(self.L).contains(0)
 
     class TestAggregates(Test):
         @returns(55)
@@ -685,7 +691,35 @@ if __name__ == '__main__':
         @returns([('AA', 'AB'), ('BA', 'BB'), ('CA', 'CB')])
         def join(self):
             return Query(['AA', 'BA', 'CA']) \
-                .join(['AB', 'BB', 'CB']) \
+                .join(['AB', 'BB', 'CB'], lambda a: a[0], lambda b: b[0], lambda a, b: (a,b)) \
                 .tolist()
+
+    class TestMisc(Test):
+        @returns(1)
+        def elementatordefault_1(self):
+            return Query(self.L).elementatordefault(1, default=42)
+        @returns(42)
+        def elementatordefault_2(self):
+            return Query(self.L).elementatordefault(0, default=42)
+        @returns([1,2,3,4,5,6,7,8,9,10])
+        def defaultifempty_1(self):
+            return Query(self.L).defaultifempty(default=[42]).tolist()
+        @returns([42])
+        def defaultifempty_2(self):
+            return Query(self.E).defaultifempty(default=[42]).tolist()
+        @returns(["Foo", "Bar"])
+        def oftype(self):
+            return Query([1, "Foo", 2, "Bar"]).oftype(str).tolist()
+        @returns([10,9,8,7,6,5,4,3,2,1])
+        def reversed(self):
+            return Query(self.L).reversed().tolist()
+        @returns([1,2,3,4,5,6])
+        def concat(self):
+            return Query([1,2,3]).concat([4,5,6]).tolist()
+        @returns([(1,3),(2,4),(3,5)])
+        def zip(self):
+            return Query([1,2,3]).zip([4,5,6], lambda a,b: (a,b))
+
+
 
     BaseTest.run_all_tests(base_class=Test, g=globals())
