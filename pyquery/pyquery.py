@@ -46,16 +46,16 @@ class Query_Partitioning(Query_Base):
                 yield i.next()
         return self.__class__(skip_gen(count))
     def take_while(self, pred):
-        def take_while_gen(pred):
+        def take_while_gen():
             i = iter(self)
             while True:
                 item = i.next()
                 if not pred(item):
                     break
                 yield item
-        return self.__class__(take_while_gen(pred))
+        return self.__class__(take_while_gen())
     def skip_while(self, pred):
-        def skip_while_gen(pred):
+        def skip_while_gen():
             i = iter(self)
             while True:
                 item = i.next()
@@ -64,7 +64,7 @@ class Query_Partitioning(Query_Base):
                     break
             while True:
                 yield i.next()
-        return self.__class__(skip_while_gen(pred))
+        return self.__class__(skip_while_gen())
 
 class Query_Ordering(Query_Base):
     def order_by(self, key_selector=None):
@@ -398,7 +398,7 @@ if __name__ == '__main__':
                     ok, fail, ran,
                     color(color.DEFAULT),
                     color(color.FG_BROWN, color.BOLD),
-                    color(color.FG_GREEN if ok == ran else color.RED, color.BOLD))
+                    color(color.FG_GREEN if ok == ran else color.FG_RED, color.BOLD))
                 tests_ok += ok
                 tests_fail += fail
                 tests_ran += ran
@@ -812,6 +812,6 @@ if __name__ == '__main__':
             return Query(self.L).sequence_equal(self.L)
 
     import sys
-    if len(sys.argv) >= 1 and sys.argv[1] == '--mono':
+    if len(sys.argv) >= 2 and sys.argv[1] == '--mono':
         color.ENABLED = False
     BaseTest.run_all_tests(base_class=Test, g=globals())
