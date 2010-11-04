@@ -1,132 +1,133 @@
-TestGeneration
-   dummy
-TestGeneration -- ok: 1/1; failed: 0/1
-
 TestConversion
-   todict_1
-   todict_2
-   todict_3
+  to_dict_1
+  to_dict_2
+  to_dict_3
 TestConversion -- ok: 3/3; failed: 0/3
 
 TestQuantifiers
-   all_1a
-   all_1b
-   all_2a
-   all_2b
-   any_1a
-   any_1b
-   any_2a
-   any_2b
-   contains_1 raises: AttributeError ('Query' object has no attribute 'contains'); expected result: True
-   contains_2 raises: AttributeError ('Query' object has no attribute 'contains'); expected result: False
-TestQuantifiers -- ok: 8/10; failed: 2/10
+  all_1a
+  all_1b
+  all_2a
+  all_2b
+  any_1a
+  any_1b
+  any_2a
+  any_2b
+  contains_1
+  contains_2
+TestQuantifiers -- ok: 10/10; failed: 0/10
 
 TestPartitioning
-   skip
-   skipwhile
-   take
-   takewhile
+  skip
+  skip_while
+  take
+  take_while
 TestPartitioning -- ok: 4/4; failed: 0/4
 
 TestElement
-   elementat_1
-   elementat_2
-   first_1a
-   first_1b
-   first_2a
-   first_2b
-   firstordefault_1
-   firstordefault_2
-   last_1a
-   last_1b
-   last_2a
-   last_2b
-   single_1a
-   single_1b
-   single_1c
-   single_2a
-   single_2b
-   single_2c
-   singleordefault_1a
-   singleordefault_1b
-   singleordefault_1c
-   singleordefault_1d
-   singleordefault_2a
-   singleordefault_2b
-   singleordefault_2c
-   singleordefault_2d
+  element_at_1
+  element_at_2
+  first_1a
+  first_1b
+  first_2a
+  first_2b
+  first_or_default_1
+  first_or_default_2
+  last_1a
+  last_1b
+  last_2a
+  last_2b
+  single_1a
+  single_1b
+  single_1c
+  single_2a
+  single_2b
+  single_2c
+  single_or_default_1a
+  single_or_default_1b
+  single_or_default_1c
+  single_or_default_1d
+  single_or_default_2a
+  single_or_default_2b
+  single_or_default_2c
+  single_or_default_2d
 TestElement -- ok: 26/26; failed: 0/26
 
+TestGeneration
+  dummy
+TestGeneration -- ok: 1/1; failed: 0/1
+
 TestJoins
-   join raises: AttributeError ('Query' object has no attribute 'join'); expected result: [('AA', 'AB'), ('BA', 'BB'), ('CA', 'CB')]
+  join result: [('A', 'B'), ('B', 'B'), ('C', 'B')]; expected result: [('AA', 'AB'), ('BA', 'BB'), ('CA', 'CB')]
 TestJoins -- ok: 0/1; failed: 1/1
 
 TestOrdering
-   orderby_1
-   orderby_2
-   thenby_1 result: [(2, 1), (3, 3), (7, 3), (1, 4), (2, 5), (3, 5), (1, 6), (1, 9), (2, 9), (2, 10)]; expected result: []
+  order_by_1
+  order_by_2
+  then_by_1 raises: AttributeError ('Query' object has no attribute 'then_by'); expected result: []
 TestOrdering -- ok: 2/3; failed: 1/3
 
 TestRestriction
-   where
+  where
 TestRestriction -- ok: 1/1; failed: 0/1
 
 TestGrouping
-   groupby
+  group_by
 TestGrouping -- ok: 1/1; failed: 0/1
 
 TestAggregates
-   aggregate_1
-   aggregate_2
-   aggregate_3
-   average_1a
-   average_1b
-   average_2a
-   average_2b
-   count_1a
-   count_1b
-   count_2a
-   count_2b
-   max_1a
-   max_1b
-   max_2a
-   max_2b
-   min_1a
-   min_1b
-   min_2a
-   min_2b
-   sum_1a
-   sum_1b
-   sum_2a
-   sum_2b
+  aggregate_1
+  aggregate_2
+  aggregate_3
+  average_1a
+  average_1b
+  average_2a
+  average_2b
+  count_1a
+  count_1b
+  count_2a
+  count_2b
+  max_1a
+  max_1b
+  max_2a
+  max_2b
+  min_1a
+  min_1b
+  min_2a
+  min_2b
+  sum_1a
+  sum_1b
+  sum_2a
+  sum_2b
 TestAggregates -- ok: 23/23; failed: 0/23
 
 TestMisc
-   concat raises: AttributeError ('Query' object has no attribute 'concat'); expected result: [1, 2, 3, 4, 5, 6]
-   defaultifempty_1 raises: AttributeError ('Query' object has no attribute 'defaultifempty'); expected result: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-   defaultifempty_2 raises: AttributeError ('Query' object has no attribute 'defaultifempty'); expected result: [42]
-   elementatordefault_1 raises: AttributeError ('Query' object has no attribute 'elementatordefault'); expected result: 1
-   elementatordefault_2 raises: AttributeError ('Query' object has no attribute 'elementatordefault'); expected result: 42
-   oftype raises: AttributeError ('Query' object has no attribute 'oftype'); expected result: ['Foo', 'Bar']
-   repeat raises: AttributeError (type object 'Query' has no attribute 'repeat'); expected result: [6, 6, 6]
-   reversed raises: AttributeError ('Query' object has no attribute 'reversed'); expected result: [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-   sequenceequal raises: AttributeError ('Query' object has no attribute 'sequenceequal'); expected result: True
-   zip raises: AttributeError ('Query' object has no attribute 'zip'); expected result: [(1, 3), (2, 4), (3, 5)]
-TestMisc -- ok: 0/10; failed: 10/10
+  concat
+  default_if_empty_1 result: [42]; expected result: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  default_if_empty_2
+  element_at_or_default_1
+  element_at_or_default_2
+  of_type
+  repeat
+  reversed
+  sequence_equal
+  zip_1
+  zip_2
+TestMisc -- ok: 10/11; failed: 1/11
 
 TestSets
-   difference
-   distinct
-   interect
-   union
+  difference
+  distinct
+  interect
+  union
 TestSets -- ok: 4/4; failed: 0/4
 
 TestProjection
-   select
-   selectmany_1
-   selectmany_2
-   selectmany_3
-   selectmany_4 raises: TypeError (selectmany() takes at least 2 arguments (1 given)); expected result: ['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs']
-TestProjection -- ok: 4/5; failed: 1/5
+  select
+  select_many_1
+  select_many_2
+  select_many_3
+  select_many_4
+TestProjection -- ok: 5/5; failed: 0/5
 
-ok: 77/92; fail: 15/92; failing: TestQuantifiers, TestJoins, TestOrdering, TestMisc, TestProjection
+ok: 90/93; fail: 3/93; failing: TestJoins, TestOrdering, TestMisc

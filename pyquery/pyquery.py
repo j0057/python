@@ -11,19 +11,22 @@ class Query_Base(object):
 class Query_Restriction(Query_Base):
     def where(self, pred):
         return self.__class__(item for item in self if pred(item))
+    def of_type(self, type_):
+        return self.where(lambda item: type(item) == type_)        
 
 class Query_Projection(Query_Base):
     def select(self, func):
         return self.__class__(func(item) for item in self)
-    def selectmany(self, seq_selector, result_selector=None):
-        def selectmany_gen(seq_selector, result_selector):
+    def select_many(self, seq_selector=None, result_selector=None):
+        if not seq_selector: seq_selector = lambda x: x
+        def select_many_gen():
             for sub_seq in self:
                 for item in seq_selector(sub_seq):
                     if result_selector:
                         yield result_selector(item)
                     else:
                         yield item
-        return self.__class__(selectmany_gen(seq_selector, result_selector))
+        return self.__class__(select_many_gen())
 
 class Query_Partitioning(Query_Base):
     def take(self, count):
@@ -42,17 +45,17 @@ class Query_Partitioning(Query_Base):
             while True:
                 yield i.next()
         return self.__class__(skip_gen(count))
-    def takewhile(self, pred):
-        def takewhile_gen(pred):
+    def take_while(self, pred):
+        def take_while_gen(pred):
             i = iter(self)
             while True:
                 item = i.next()
                 if not pred(item):
                     break
                 yield item
-        return self.__class__(takewhile_gen(pred))
-    def skipwhile(self, pred):
-        def skipwhile_gen(pred):
+        return self.__class__(take_while_gen(pred))
+    def skip_while(self, pred):
+        def skip_while_gen(pred):
             i = iter(self)
             while True:
                 item = i.next()
@@ -61,18 +64,19 @@ class Query_Partitioning(Query_Base):
                     break
             while True:
                 yield i.next()
-        return self.__class__(skipwhile_gen(pred))
+        return self.__class__(skip_while_gen(pred))
 
 class Query_Ordering(Query_Base):
-    def orderby(self, key_selector=None):
-        def orderby_gen():
+    def order_by(self, key_selector=None):
+        def order_by_gen():
             for item in sorted(self, key=key_selector):
                 yield item
-        return self.__class__(orderby_gen())
-    thenby = orderby
+        return self.__class__(order_by_gen())
+    def reversed(self):
+        return self.__class__(item for item in list(self)[::-1])
 
 class Query_Grouping(Query_Base):
-    def groupby(self, key_selector=None, val_selector=None):
+    def group_by(self, key_selector=None, val_selector=None):
         result = {} # this is greedy...but there's no other way to do it other than returning the same key
                     # multiple times.
         key_selector = key_selector or (lambda item: item)
@@ -123,17 +127,17 @@ class Query_Sets(Query_Base):
         return self.__class__(difference_gen())
 
 class Query_Conversion(Query_Base):
-    def tolist(self):
+    def to_list(self):
         return list(self)
-    def todict(self, proj1=None, proj2=None):
-        if proj1 and proj2:
+    def to_dict(self, key_selector=None, element_selector=None):
+        if key_selector and element_selector:
             return self \
-                .select(lambda item: (proj1(item), proj2(item))) \
-                .todict()
-        elif proj1:
+                .select(lambda item: (key_selector(item), element_selector(item))) \
+                .to_dict()
+        elif key_selector:
             return self \
-                .select(lambda item: (item, proj1(item))) \
-                .todict()
+                .select(lambda item: (key_selector(item), item)) \
+                .to_dict()
         else:
             return dict(self)
 
@@ -147,7 +151,7 @@ class Query_Elements(Query_Base):
                 return i.next()
             except StopIteration:
                 raise ValueError('Empty sequence')
-    def firstordefault(self, pred=None, default=None):
+    def first_or_default(self, pred=None, default=None):
         try:
             return self.first(pred)
         except ValueError:
@@ -163,7 +167,7 @@ class Query_Elements(Query_Base):
                 return item
             else:
                 raise ValueError('Empty sequence')
-    def lastordefault(self, pred=None, default=None):
+    def last_or_default(self, pred=None, default=None):
         try:
             return self.last(pred)
         except ValueError:
@@ -182,9 +186,9 @@ class Query_Elements(Query_Base):
                 raise ValueError('Sequence contains more than one item')
             except StopIteration:
                 return result
-    def singleordefault(self, pred=None, default=None):
+    def single_or_default(self, pred=None, default=None):
         if pred:
-            return self.where(pred).singleordefault(default=default)
+            return self.where(pred).single_or_default(default=default)
         else:
             result = no_result = object()
             i = iter(self)
@@ -197,11 +201,16 @@ class Query_Elements(Query_Base):
                 raise ValueError('Sequence contains more than one item')
             except StopIteration:
                 return result
-    def elementat(self, index):
+    def element_at(self, index):
         for idx, item in enumerate(self):
             if idx == index:
                 return item
         raise IndexError('No item with index {0}'.format(index))
+    def element_at_or_default(self, index, default=None):
+        try:
+            return self.element_at(index)
+        except IndexError:
+            return default
     
 class Query_Generation(Query_Base):
     pass
@@ -223,6 +232,8 @@ class Query_Quantifiers(Query_Base):
                 if not item:
                     return False
             return True
+    def contains(self, value):
+        return self.any(lambda item: item == value)
 
 class Query_Aggregates(Query_Base):
     def aggregate(self, func, initial=None, allow_empty=True):
@@ -276,16 +287,57 @@ class Query_Misc(Query_Base):
     pass
 
 class Query_Joins(Query_Base):
-    pass
+    def join(self, inner, outer_key, inner_key, result):
+        inner_items = inner \
+            .group_by(inner_key) \
+            .to_dict(lambda (k, g): k, lambda (k, g): g)
+        return Query(self
+            .where(lambda i: outer_key(i) in inner_items)
+            .select_many(lambda i: inner_items[outer_key(i)], result))
         
 class Query(Query_Restriction, Query_Projection, Query_Partitioning, Query_Ordering, Query_Grouping, Query_Sets, 
         Query_Conversion, Query_Elements, Query_Generation, Query_Quantifiers, Query_Aggregates, Query_Misc, 
         Query_Joins):
-    pass
-        
+    @staticmethod
+    def repeat(value):
+        def repeat_gen():
+            while True:
+                yield value
+        return Query(repeat_gen())
+    def concat(self, other):
+        def concat_gen():
+            for item in self:
+                yield item
+            for item in other:
+                yield item
+        return self.__class__(concat_gen())
+    def zip(self, other, selector=None):
+        def zip_gen():
+            iter1 = iter(self)
+            iter2 = iter(other)
+            while True:
+                yield selector(iter1.next(), iter2.next())
+        if selector:
+            return self.__class__(zip_gen())
+        else:
+            return self.zip(other, lambda a, b: (a, b))
+    def sequence_equal(self, other):
+        return self.zip(other).all(lambda (a, b): a == b)
+    def default_if_empty(self, default=None):
+        try:
+            raise StopIteration
+        except StopIteration:
+            return self.__class__(default)
 Q = Query
 
 if __name__ == '__main__':
+    def color(*c):
+        return '\x1B[{0}m'.format(';'.join(map(str, c))) if color.ENABLED else ''
+    map(lambda (k, v): setattr(color, k, v), dict(DEFAULT=0, BOLD=1, 
+        FG_BLACK=30, FG_RED=31, FG_GREEN=32, FG_BROWN=33, FG_BLUE=34, FG_MAGENTA=35, FG_CYAN=36, FG_WHITE=37, 
+        BG_BLACK=40, BG_RED=41, BG_GREEN=42, BG_BROWN=43, BG_BLUE=44, BG_MAGENTA=45, BG_CYAN=46, BG_WHITE=47,
+        ENABLED=True).items())	
+
     class BaseDec(object):
         def __init__(self, func):
             self.func = func
@@ -339,8 +391,14 @@ if __name__ == '__main__':
         def run_tests(*classes):
             tests_ok, tests_fail, tests_ran, failed = 0, 0, 0, []
             for class_ in classes:
-                print class_.__name__
+                print color(color.FG_BROWN, color.BOLD) + class_.__name__ + color(color.DEFAULT)
                 ok, fail, ran = class_().run()
+                print '{5}{0}{4} -- {6}ok: {1}/{3}; failed: {2}/{3}{4}'.format(
+                    class_.__name__,
+                    ok, fail, ran,
+                    color(color.DEFAULT),
+                    color(color.FG_BROWN, color.BOLD),
+                    color(color.FG_GREEN, color.BOLD) if ok == ran else color(color.FG_RED, color.BOLD))
                 tests_ok += ok
                 tests_fail += fail
                 tests_ran += ran
@@ -362,16 +420,15 @@ if __name__ == '__main__':
             tests_fail = 0
             tests_total = len(methods)
             for method in methods:
-                print '  ', method.__name__,
+                
                 try:
                     result = method()
-                    print
+                    print '  ' + color(color.FG_GREEN, color.BOLD) + method.__name__ + color(color.DEFAULT)
                     tests_ok += 1
                 except Exception as ex:
-                    print ex
+                    print '  ' + color(color.FG_RED, color.BOLD) + method.__name__ + color(color.DEFAULT) \
+                        + ' ' + str(ex)
                     tests_fail += 1
-            print '{0} -- ok: {1}/{3}; failed: {2}/{3}'.format(
-                type(self).__name__, tests_ok, tests_fail, tests_total)
             return tests_ok, tests_fail, tests_total            
         
     class Test(BaseTest):
@@ -391,121 +448,125 @@ if __name__ == '__main__':
     class TestRestriction(Test):
         @returns([2, 4, 6, 8, 10])
         def where(self):
-            return Query(self.L).where(lambda n: n % 2 == 0).tolist()
+            return Query(self.L) \
+                .where(lambda n: n % 2 == 0) \
+                .to_list()
 
     class TestProjection(Test):
         @returns([2, 4, 6, 8, 10, 12, 14, 16, 18, 20])
         def select(self):
-            return Query(self.L).select(lambda n: n * 2).tolist()
+            return Query(self.L) \
+                .select(lambda n: n * 2) \
+                .to_list()
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
-        def selectmany_1(self):
+        def select_many_1(self):
             return Query(self.W1) \
-                .selectmany(lambda s: s.split(' ')) \
-                .tolist()
+                .select_many(lambda s: s.split(' ')) \
+                .to_list()
         @returns(['he', 'uick', 'rown', 'ox', 'umps', 'ver', 'he', 'azy', 'ogs'])
-        def selectmany_2(self):
+        def select_many_2(self):
             return Query(self.W1) \
-                .selectmany(lambda s: s.split(' '), lambda s: s[1:]) \
-                .tolist()
+                .select_many(lambda s: s.split(' '), lambda s: s[1:]) \
+                .to_list()
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
-        def selectmany_3(self):
+        def select_many_3(self):
             return Query(self.W2) \
-                .selectmany(lambda sx: sx) \
-                .tolist()
+                .select_many(lambda sx: sx) \
+                .to_list()
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
-        def selectmany_4(self):
+        def select_many_4(self):
             return Query(self.W1) \
                 .select(lambda s: s.split(' ')) \
-                .selectmany() \
-                .tolist()
+                .select_many() \
+                .to_list()
 
     class TestPartitioning(Test):
         @returns([1, 2, 3])
         def take(self):
-            return Query(self.L).take(3).tolist()
+            return Query(self.L).take(3).to_list()
         @returns([8, 9, 10])
         def skip(self):
-            return Query(self.L).skip(7).tolist()
+            return Query(self.L).skip(7).to_list()
         @returns([1, 2, 3])
-        def takewhile(self):
-            return Query(self.L).takewhile(lambda n: n < 4).tolist()
+        def take_while(self):
+            return Query(self.L).take_while(lambda n: n < 4).to_list()
         @returns([8, 9, 10])
-        def skipwhile(self):
-            return Query(self.L).skipwhile(lambda n: n < 8).tolist()
+        def skip_while(self):
+            return Query(self.L).skip_while(lambda n: n < 8).to_list()
 
     class TestOrdering(Test):
         @returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        def orderby_1(self):
+        def order_by_1(self):
             return Query(self.R1) \
-                .orderby() \
-                .tolist()
+                .order_by() \
+                .to_list()
         @returns([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        def orderby_2(self):
+        def order_by_2(self):
             return Query(self.R1) \
-                .orderby(lambda n: n) \
-                .tolist()
+                .order_by(lambda n: n) \
+                .to_list()
         @returns([])
-        def thenby_1(self):
+        def then_by_1(self):
             return Query(self.R2) \
-                .orderby(lambda n: n[0]) \
-                .thenby(lambda n: n[1]) \
-                .tolist()
+                .order_by(lambda n: n[0]) \
+                .then_by(lambda n: n[1]) \
+                .to_list()
 
     class TestGrouping(Test):
         @returns({'b':['blueberry', 'banana'], 'c':['chimpanzee', 'cheese'], 'a':['abacus', 'apple']})
-        def groupby(self):
+        def group_by(self):
             return Query(self.G) \
-                .groupby(lambda s: s[0]) \
-                .select(lambda (key, items): (key, items.tolist())) \
-                .todict()
+                .group_by(lambda s: s[0]) \
+                .select(lambda (key, items): (key, items.to_list())) \
+                .to_dict()
 
     class TestSets(Test):
         @returns([2,3,5])
         def distinct(self):
             return Query([2,2,3,5,5]) \
                 .distinct() \
-                .tolist()
+                .to_list()
         @returns([0,2,4,5,6,8,9,1,3,7])
         def union(self):
             return Query(self.S1) \
                 .union(Query(self.S2)) \
-                .tolist()
+                .to_list()
         @returns([5,8])
         def interect(self):
             return Query(self.S1) \
                 .intersect(Query(self.S2)) \
-                .tolist()
+                .to_list()
         @returns([0,2,4,6,9])
         def difference(self):
             return Query(self.S1) \
                 .difference(Query(self.S2)) \
-                .tolist()
+                .to_list()
 
     class TestConversion(Test):
         @returns({1:2, 2:4, 3:6, 4:8})
-        def todict_1(self):
+        def to_dict_1(self):
             return Query(self.L) \
                 .where(lambda n: n <= 4) \
                 .select(lambda n: (n, 2*n)) \
-                .todict()
-        @returns({1:2, 2:4, 3:6, 4:8})
-        def todict_2(self):
+                .to_dict()
+        @returns({2:1, 4:2, 6:3, 8:4})
+        def to_dict_2(self):
             return Query(self.L) \
                 .where(lambda n: n <= 4) \
-                .todict(lambda n: 2 * n)
+                .to_dict(lambda n: 2 * n)
         @returns({2:3, 4:6, 6:9, 8:12})
-        def todict_3(self):
+        def to_dict_3(self):
             return Query(self.L) \
                 .where(lambda n: n <= 4) \
-                .todict(lambda n: 2 * n, lambda n: 3 * n)
+                .to_dict(lambda n: 2 * n, lambda n: 3 * n)
 
     class TestElement(Test):
         @returns(1)
-        def elementat_1(self):
-            return Query(self.L).elementat(0)
+        def element_at_1(self):
+            return Query(self.L).element_at(0)
         @returns(10)
-        def elementat_2(self):
-            return Query(self.L).elementat(9)
+        def element_at_2(self):
+            return Query(self.L).element_at(9)
         @returns(1)
         def first_1a(self):
             return Query(self.L).first()
@@ -531,11 +592,11 @@ if __name__ == '__main__':
         def last_2b(self):
             return Query(self.E).last(lambda n: 3 <= n <= 4)
         @returns(1)
-        def firstordefault_1(self):
-            return Query(self.L).firstordefault()
+        def first_or_default_1(self):
+            return Query(self.L).first_or_default()
         @returns(42)
-        def firstordefault_2(self):
-            return Query(self.E).firstordefault(default=42)
+        def first_or_default_2(self):
+            return Query(self.E).first_or_default(default=42)
         @returns(4)
         def single_1a(self):
             return Query(self.L).where(lambda n: n == 4).single()
@@ -555,29 +616,29 @@ if __name__ == '__main__':
         def single_2c(self):
             return Query(self.L).single(lambda n: n >= 4)
         @returns(4)
-        def singleordefault_1a(self):
-            return Query(self.L).where(lambda n: n == 4).singleordefault(default=42)
+        def single_or_default_1a(self):
+            return Query(self.L).where(lambda n: n == 4).single_or_default(default=42)
         @returns(42)
-        def singleordefault_1b(self):
-            return Query(self.L).where(lambda n: n > 10).singleordefault(default=42)
+        def single_or_default_1b(self):
+            return Query(self.L).where(lambda n: n > 10).single_or_default(default=42)
         @raises(ValueError)
-        def singleordefault_1c(self):
-            return Query(self.L).where(lambda n: n < 4).singleordefault(default=42)
+        def single_or_default_1c(self):
+            return Query(self.L).where(lambda n: n < 4).single_or_default(default=42)
         @raises(ValueError)
-        def singleordefault_1d(self):
-            return Query(self.L).where(lambda n: n >= 4).singleordefault(default=42)
+        def single_or_default_1d(self):
+            return Query(self.L).where(lambda n: n >= 4).single_or_default(default=42)
         @returns(4)
-        def singleordefault_2a(self):
-            return Query(self.L).singleordefault(lambda n: n == 4, default=42)
+        def single_or_default_2a(self):
+            return Query(self.L).single_or_default(lambda n: n == 4, default=42)
         @returns(42)
-        def singleordefault_2b(self):
-            return Query(self.L).singleordefault(lambda n: n > 10, default=42)
+        def single_or_default_2b(self):
+            return Query(self.L).single_or_default(lambda n: n > 10, default=42)
         @raises(ValueError)
-        def singleordefault_2c(self):
-            return Query(self.L).singleordefault(lambda n: n < 4, default=42)
+        def single_or_default_2c(self):
+            return Query(self.L).single_or_default(lambda n: n < 4, default=42)
         @raises(ValueError)
-        def singleordefault_2d(self):
-            return Query(self.L).singleordefault(lambda n: n >= 4, default=42)
+        def single_or_default_2d(self):
+            return Query(self.L).single_or_default(lambda n: n >= 4, default=42)
 
     class TestGeneration(Test):
         @returns(None)
@@ -691,41 +752,67 @@ if __name__ == '__main__':
         @returns([('AA', 'AB'), ('BA', 'BB'), ('CA', 'CB')])
         def join(self):
             return Query(['AA', 'BA', 'CA']) \
-                .join(['AB', 'BB', 'CB'], lambda a: a[0], lambda b: b[0], lambda a, b: (a,b)) \
-                .tolist()
+                .join(
+                    Query(['AB', 'BB', 'CB']), 
+                    lambda a: a[0], 
+                    lambda b: b[0], 
+                    lambda (a,b): (a,b)) \
+                .to_list()
 
     class TestMisc(Test):
         @returns(1)
-        def elementatordefault_1(self):
-            return Query(self.L).elementatordefault(1, default=42)
+        def element_at_or_default_1(self):
+            return Query(self.L) \
+                .element_at_or_default(0, default=42)
         @returns(42)
-        def elementatordefault_2(self):
-            return Query(self.L).elementatordefault(0, default=42)
+        def element_at_or_default_2(self):
+            return Query(self.L) \
+                .element_at_or_default(11, default=42)
         @returns([1,2,3,4,5,6,7,8,9,10])
-        def defaultifempty_1(self):
-            return Query(self.L).defaultifempty(default=[42]).tolist()
+        def default_if_empty_1(self):
+            return Query(self.L) \
+                .default_if_empty(default=[42]) \
+                .to_list()
         @returns([42])
-        def defaultifempty_2(self):
-            return Query(self.E).defaultifempty(default=[42]).tolist()
+        def default_if_empty_2(self):
+            return Query(self.E) \
+                .default_if_empty(default=[42]) \
+                .to_list()
         @returns(["Foo", "Bar"])
-        def oftype(self):
-            return Query([1, "Foo", 2, "Bar"]).oftype(str).tolist()
+        def of_type(self):
+            return Query([1, "Foo", 2, "Bar"]) \
+                .of_type(str) \
+                .to_list()
         @returns([10,9,8,7,6,5,4,3,2,1])
         def reversed(self):
-            return Query(self.L).reversed().tolist()
+            return Query(self.L) \
+                .reversed() \
+                .to_list()
         @returns([1,2,3,4,5,6])
         def concat(self):
-            return Query([1,2,3]).concat([4,5,6]).tolist()
-        @returns([(1,3),(2,4),(3,5)])
-        def zip(self):
-            return Query([1,2,3]).zip([4,5,6], lambda a,b: (a,b))
+            return Query([1,2,3]) \
+                .concat([4,5,6]) \
+                .to_list()
+        @returns([(1,4),(2,5),(3,6)])
+        def zip_1(self):
+            return Query([1,2,3]) \
+                .zip([4,5,6]) \
+                .to_list()
+        @returns([(1,4),(2,5),(3,6)])
+        def zip_2(self):
+            return Query([1,2,3]) \
+                .zip([4,5,6], lambda a, b: (a,b)) \
+                .to_list()
         @returns([6,6,6])
         def repeat(self):
-            return Query.repeat(6).take(3).tolist()
+            return Query.repeat(6) \
+                .take(3) \
+                .to_list()
         @returns(True)
-        def sequenceequal(self):
-            return Query(self.L).sequenceequal(self.L)
+        def sequence_equal(self):
+            return Query(self.L).sequence_equal(self.L)
 
-
-
+    import sys
+    if len(sys.argv) >= 1 and sys.argv[1] == '--mono':
+        color.ENABLED = False
     BaseTest.run_all_tests(base_class=Test, g=globals())
