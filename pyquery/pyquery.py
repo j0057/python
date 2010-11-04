@@ -398,7 +398,7 @@ if __name__ == '__main__':
                     ok, fail, ran,
                     color(color.DEFAULT),
                     color(color.FG_BROWN, color.BOLD),
-                    color(color.FG_GREEN, color.BOLD) if ok == ran else color(color.FG_RED, color.BOLD))
+                    color(color.FG_GREEN if ok == ran else color.RED, color.BOLD))
                 tests_ok += ok
                 tests_fail += fail
                 tests_ran += ran
@@ -413,7 +413,6 @@ if __name__ == '__main__':
         def run(self):
             methods = [ getattr(self, name)
                 for name in sorted(dir(self))
-                #if name.startswith('test_')
                 if callable(getattr(self, name)) 
                 if hasattr(getattr(self, name), 'is_test') ]
             tests_ok = 0
