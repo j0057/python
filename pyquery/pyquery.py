@@ -77,8 +77,7 @@ class Query_Ordering(Query_Base):
 
 class Query_Grouping(Query_Base):
     def group_by(self, key_selector=None, val_selector=None):
-        result = {} # this is greedy...but there's no other way to do it other than returning the same key
-                    # multiple times.
+        result = {} 
         key_selector = key_selector or (lambda item: item)
         val_selector = val_selector or (lambda item: item)
         for k, v in self.select(lambda item: (key_selector(item), val_selector(item))):
