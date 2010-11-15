@@ -1,0 +1,28 @@
+Tests
+  euler_001 23
+  euler_002 44
+  euler_003 29
+  euler_004 9009
+  euler_005 2520
+  euler_006 2640
+  euler_007 13
+  euler_008 81
+  euler_010 17
+  euler_025 12
+Tests -- ok: 10/10; failed: 0/10
+
+Results
+  euler_001 233168
+  euler_002 4613732
+  euler_003 6857
+  euler_004 906609
+  euler_005 232792560
+  euler_006 25164150
+  euler_007 104743
+  euler_008 40824
+  euler_009 31875000
+  euler_010 142913828922
+  euler_025 4782
+Results -- ok: 11/11; failed: 0/11
+
+ok: 21/21; fail: 0/21; failing: 

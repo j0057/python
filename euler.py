@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from jtest import BaseTest, returns, raises
+from jtest import BaseTest, returns, raises, color
 from pyquery import Query
 from itertools import count
+import sys
 
 class Tests(BaseTest):
     pass
@@ -142,7 +143,7 @@ def euler_008(n):
 @result_of(1000)
 def euler_009(n):
     for a in xrange(1, n):
-        for b in xrange(1, n):
+        for b in xrange(a, n):
             if a + b >= n: 
                 break
             c = n - a - b
@@ -168,4 +169,5 @@ def euler_025(n):
 ###############################################################################    
 
 if __name__ == '__main__':
+    color.ENABLED = sys.stdout.isatty()
     BaseTest.run_all_tests(base_class=BaseTest, g=globals())
