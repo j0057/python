@@ -17,15 +17,13 @@ class Query_Restriction(Query_Base):
 class Query_Projection(Query_Base):
     def select(self, func):
         return self.__class__(func(item) for item in self)
-    def select_many(self, seq_selector=None, result_selector=None):
-        if not seq_selector: seq_selector = lambda x: x
+    def select_many(self, seq_selector=None, res_selector=None):
+        seq_selector = seq_selector or (lambda i: i)
+        res_selector = res_selector or (lambda ss,i: (ss,i))
         def select_many_gen():
             for sub_seq in self:
                 for item in seq_selector(sub_seq):
-                    if result_selector:
-                        yield result_selector(item)
-                    else:
-                        yield item
+                    yield res_selector(sub_seq, item)
         return self.__class__(select_many_gen())
 
 class Query_Partitioning(Query_Base):
@@ -330,105 +328,7 @@ class Query(Query_Restriction, Query_Projection, Query_Partitioning, Query_Order
 Q = Query
 
 if __name__ == '__main__':
-    def color(*c):
-        return '\x1B[{0}m'.format(';'.join(map(str, c))) if color.ENABLED else ''
-    map(lambda (k, v): setattr(color, k, v), dict(DEFAULT=0, BOLD=1, 
-        FG_BLACK=30, FG_RED=31, FG_GREEN=32, FG_BROWN=33, FG_BLUE=34, FG_MAGENTA=35, FG_CYAN=36, FG_WHITE=37, 
-        BG_BLACK=40, BG_RED=41, BG_GREEN=42, BG_BROWN=43, BG_BLUE=44, BG_MAGENTA=45, BG_CYAN=46, BG_WHITE=47,
-        ENABLED=True).items())	
-
-    class BaseDec(object):
-        def __init__(self, func):
-            self.func = func
-            self.__name__ = self.func.__name__
-        def __get__(self, object, type=None):
-            if type is None:
-                return self
-            new_func = self.func.__get__(object, type)
-            return self.__class__(new_func)
-
-    def returns(value):
-        class returns_dec(BaseDec):
-            is_test = True
-            def __call__(self, *a, **k):
-                try:
-                    result = self.func(*a, **k)
-                    assert result == value, \
-                        'result: {0}; expected result: {1}'.format(result, value)
-                    return result
-                except AssertionError:
-                    raise
-                except Exception as ex:
-                    assert False, \
-                        'raises: {0} ({1}); expected result: {2}'.format(type(ex).__name__, str(ex), value)    
-        return returns_dec
-
-    def raises(exception_type):
-        class raises_dec(BaseDec):
-            is_test = True
-            def __call__(self, *a, **k):
-                try:
-                    result = self.func(*a, **k)
-                    assert False, \
-                        'result: {0}; expected exception: {1}'.format(result, exception_type.__name__)
-                except AssertionError:
-                    raise
-                except Exception as ex:
-                    assert type(ex) == exception_type, \
-                        'raises: {0} ({1}); expected exception: {2}'.format(type(ex).__name__, str(ex), exception_type.__name__)
-        return raises_dec
-
-    class BaseTest(object):
-        @staticmethod
-        def run_all_tests(base_class, g=None):
-            if g is None: g = globals()
-            BaseTest.run_tests(*[ obj
-                for obj in g.itervalues()
-                if isinstance(obj, type)
-                if base_class in obj.__bases__ ])
-        @staticmethod
-        def run_tests(*classes):
-            tests_ok, tests_fail, tests_ran, failed = 0, 0, 0, []
-            for class_ in classes:
-                print color(color.FG_BROWN, color.BOLD) + class_.__name__ + color(color.DEFAULT)
-                ok, fail, ran = class_().run()
-                print '{5}{0}{4} -- {6}ok: {1}/{3}; failed: {2}/{3}{4}'.format(
-                    class_.__name__,
-                    ok, fail, ran,
-                    color(color.DEFAULT),
-                    color(color.FG_BROWN, color.BOLD),
-                    color(color.FG_GREEN if ok == ran else color.FG_RED, color.BOLD))
-                tests_ok += ok
-                tests_fail += fail
-                tests_ran += ran
-                if fail:
-                    failed += [class_.__name__]
-                print
-            print 'ok: {0}/{2}; fail: {1}/{2}; failing: {3}'.format(
-                tests_ok,
-                tests_fail,
-                tests_ran,
-                ', '.join(failed))
-        def run(self):
-            methods = [ getattr(self, name)
-                for name in sorted(dir(self))
-                if callable(getattr(self, name)) 
-                if hasattr(getattr(self, name), 'is_test') ]
-            tests_ok = 0
-            tests_fail = 0
-            tests_total = len(methods)
-            for method in methods:
-                
-                try:
-                    result = method()
-                    print '  ' + color(color.FG_GREEN, color.BOLD) + method.__name__ + color(color.DEFAULT)
-                    tests_ok += 1
-                except Exception as ex:
-                    print '  ' + color(color.FG_RED, color.BOLD) + method.__name__ + color(color.DEFAULT) \
-                        + ' ' + str(ex)
-                    tests_fail += 1
-            return tests_ok, tests_fail, tests_total            
-        
+    from jtest import BaseTest, returns, raises
     class Test(BaseTest):
         def __init__(self):
             self.L  = [1,2,3,4,5,6,7,8,9,10]
@@ -459,23 +359,23 @@ if __name__ == '__main__':
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
         def select_many_1(self):
             return Query(self.W1) \
-                .select_many(lambda s: s.split(' ')) \
+                .select_many(lambda s: s.split(' '), lambda s,w: w) \
                 .to_list()
         @returns(['he', 'uick', 'rown', 'ox', 'umps', 'ver', 'he', 'azy', 'ogs'])
         def select_many_2(self):
             return Query(self.W1) \
-                .select_many(lambda s: s.split(' '), lambda s: s[1:]) \
+                .select_many(lambda s: s.split(' '), lambda s,w: w[1:]) \
                 .to_list()
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
         def select_many_3(self):
             return Query(self.W2) \
-                .select_many(lambda sx: sx) \
+                .select_many(lambda sx: sx, lambda s,w: w) \
                 .to_list()
         @returns(['The', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'dogs'])
         def select_many_4(self):
             return Query(self.W1) \
                 .select(lambda s: s.split(' ')) \
-                .select_many() \
+                .select_many(res_selector=lambda s,w: w) \
                 .to_list()
 
     class TestPartitioning(Test):
@@ -812,5 +712,5 @@ if __name__ == '__main__':
 
     import sys
     if len(sys.argv) >= 2 and sys.argv[1] == '--mono':
-        color.ENABLED = False
+        jtest.color.ENABLED = False
     BaseTest.run_all_tests(base_class=Test, g=globals())
