@@ -66,7 +66,26 @@ def prime_factors(n):
     first = Query(factors(n)).take(2).last()
     return [n] if first == 1 else (prime_factors(first) + prime_factors(n / first))
 
-        
+def collatz(n):
+    while True:
+        yield n
+        if n == 1:
+            break
+        if n & 1:
+            n = 3 * n + 1
+        else:
+            n = n / 2
+
+def collatz_len(n, cache={1:1}):
+    if n in cache:
+        return cache[n]
+    if n & 1:
+        cache[n] = 1 + collatz_len(3 * n + 1)
+    else:
+        cache[n] = 1 + collatz_len(n / 2)
+    return cache[n]
+
+
 ###############################################################################    
 
 @result_of(1000)
@@ -160,6 +179,10 @@ def euler_010(n):
     return Query(primes()) \
         .take_while(lambda i: i < n) \
         .sum()
+
+@result_of(1000000)
+def euler_014(n):
+    return max(xrange(1,n), key=collatz_len)
 
 @result_of(1000)
 @test(12, 3)
