@@ -22,7 +22,8 @@ Results
   euler_008 40824
   euler_009 31875000
   euler_010 142913828922
+  euler_014 837799
   euler_025 4782
-Results -- ok: 11/11; failed: 0/11
+Results -- ok: 12/12; failed: 0/12
 
-ok: 21/21; fail: 0/21; failing: 
+ok: 22/22; fail: 0/22; failing: 
