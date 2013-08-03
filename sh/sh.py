@@ -1,7 +1,7 @@
+from __future__ import with_statement
+
 __author__ = 'Joost Molenaar <j.j.molenaar@gmail.com>'
 __version__ = '1.0'
-
-from __future__ import with_statement
 
 import os
 import os.path
@@ -94,6 +94,7 @@ def tailf(filename, lines=10):
     for line in catl(filename)[-lines:]:
         yield line
 
+@as_text('wgets')
 def wgetf(url):
     return urllib2.urlopen(url)
 
