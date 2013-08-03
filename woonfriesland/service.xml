@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding='utf-8'?>
+<service xmlns="http://www.w3.org/2007/app" xmlns:atom="http://www.w3.org/2005/Atom">
+    <workspace>
+        <atom:title>Schraper</atom:title>
+        <collection href="http://punosqnp.nl/schraper/huur">
+            <atom:title>Huurhuizen</atom:title>
+        </collection>
+    </workspace>
+</service>
